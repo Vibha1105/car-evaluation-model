@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoInsight — Car Evaluation Predictive Analytics</title>
+    <meta name="description" content="Interactive ML dashboard for car evaluation classification with real-time predictions, model comparison, and data exploration.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* ── RESET & TOKENS ─────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg-primary:    #0a0b10;
+            --bg-secondary:  #12131a;
+            --bg-card:       #181924;
+            --bg-card-hover: #1f2133;
+            --glass:         rgba(255,255,255,0.03);
+            --glass-border:  rgba(255,255,255,0.06);
+
+            --text-primary:  #f0f1f7;
+            --text-secondary:#8b8da3;
+            --text-muted:    #5e6078;
+
+            --accent:        #6c5ce7;
+            --accent-glow:   rgba(108,92,231,0.35);
+            --accent2:       #00cec9;
+            --accent3:       #fd79a8;
+            --accent4:       #ffeaa7;
+
+            --success:       #00b894;
+            --warning:       #fdcb6e;
+            --danger:        #e17055;
+            --info:          #74b9ff;
+
+            --radius:        14px;
+            --radius-sm:     10px;
+            --radius-xs:     6px;
+            --shadow:        0 4px 30px rgba(0,0,0,0.35);
+
+            --font:          'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --mono:          'JetBrains Mono', monospace;
+        }
+
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── ANIMATED BACKGROUND ──────────────────────── */
+        .bg-mesh {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background:
+                radial-gradient(ellipse 80% 50% at 20% 30%, rgba(108,92,231,.12) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 60% at 80% 70%, rgba(0,206,201,.08) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 50% at 50% 50%, rgba(253,121,168,.06) 0%, transparent 70%);
+            animation: meshMove 20s ease-in-out infinite alternate;
+        }
+        @keyframes meshMove {
+            0%   { transform: scale(1) translate(0,0); }
+            100% { transform: scale(1.1) translate(-30px, 20px); }
+        }
+
+        /* ── LAYOUT ───────────────────────────────────── */
+        .app-container { position: relative; z-index: 1; }
+
+        .header {
+            padding: 28px 40px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px);
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(10,11,16,0.7);
+        }
+        .logo-area { display: flex; align-items: center; gap: 14px; }
+        .logo-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; font-weight: 800; color: #fff;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+        .logo-text { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+        .logo-text span { color: var(--accent); }
+        .header-badge {
+            background: rgba(108,92,231,0.15); color: var(--accent);
+            padding: 6px 14px; border-radius: 20px; font-size: 12px;
+            font-weight: 600; border: 1px solid rgba(108,92,231,0.25);
+        }
+
+        .main-content { padding: 32px 40px; max-width: 1500px; margin: 0 auto; }
+
+        /* ── NAV TABS ─────────────────────────────────── */
+        .nav-tabs {
+            display: flex; gap: 6px; margin-bottom: 32px;
+            background: var(--bg-secondary); padding: 6px; border-radius: 12px;
+            overflow-x: auto; flex-wrap: nowrap;
+        }
+        .nav-tab {
+            padding: 10px 20px; border-radius: 8px; border: none;
+            background: transparent; color: var(--text-secondary);
+            font-family: var(--font); font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.25s; white-space: nowrap;
+        }
+        .nav-tab:hover { color: var(--text-primary); background: var(--glass); }
+        .nav-tab.active {
+            background: linear-gradient(135deg, var(--accent), #8b7cf7);
+            color: #fff; box-shadow: 0 4px 15px var(--accent-glow);
+        }
+
+        .tab-panel { display: none; animation: fadeUp 0.4s ease; }
+        .tab-panel.active { display: block; }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── CARDS ────────────────────────────────────── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+            transition: transform 0.3s, border-color 0.3s;
+        }
+        .card:hover { transform: translateY(-2px); border-color: rgba(108,92,231,0.2); }
+        .card-title {
+            font-size: 15px; font-weight: 700; margin-bottom: 18px;
+            display: flex; align-items: center; gap: 10px;
+            color: var(--text-primary);
+        }
+        .card-title .icon {
+            width: 32px; height: 32px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+        }
+
+        /* ── GRID LAYOUTS ─────────────────────────────── */
+        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 28px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 24px; margin-bottom: 28px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; margin-bottom: 28px; }
+
+        /* ── STAT CARDS ───────────────────────────────── */
+        .stat-card {
+            background: var(--bg-card); border: 1px solid var(--glass-border);
+            border-radius: var(--radius); padding: 22px 24px;
+            position: relative; overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(0,0,0,0.4); }
+        .stat-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+        }
+        .stat-card:nth-child(2)::before { background: linear-gradient(90deg, var(--accent2), var(--accent3)); }
+        .stat-card:nth-child(3)::before { background: linear-gradient(90deg, var(--accent3), var(--accent4)); }
+        .stat-card:nth-child(4)::before { background: linear-gradient(90deg, var(--accent4), var(--accent)); }
+        .stat-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 32px; font-weight: 800; margin: 8px 0 4px; }
+        .stat-sub { font-size: 12px; color: var(--text-muted); }
+        .stat-value.accent  { color: var(--accent); }
+        .stat-value.accent2 { color: var(--accent2); }
+        .stat-value.accent3 { color: var(--accent3); }
+        .stat-value.accent4 { color: var(--accent4); }
+
+        /* ── CHART CONTAINERS ─────────────────────────── */
+        .chart-wrap {
+            position: relative; width: 100%;
+            max-height: 350px;
+        }
+        .chart-wrap canvas { width: 100% !important; }
+
+        /* ── TABLE ────────────────────────────────────── */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .data-table th {
+            text-align: left; padding: 12px 14px;
+            background: rgba(108,92,231,0.1); color: var(--accent);
+            font-weight: 600; font-size: 11px; text-transform: uppercase;
+            letter-spacing: 0.8px; border-bottom: 1px solid var(--glass-border);
+        }
+        .data-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-secondary);
+        }
+        .data-table tr:hover td { background: rgba(255,255,255,0.02); color: var(--text-primary); }
+
+        /* ── MODEL COMPARISON BAR ─────────────────────── */
+        .model-bar-wrap { margin-bottom: 14px; }
+        .model-bar-label { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+        .model-bar-label span:last-child { color: var(--accent); font-family: var(--mono); }
+        .model-bar-track {
+            height: 10px; background: rgba(255,255,255,0.06);
+            border-radius: 5px; overflow: hidden;
+        }
+        .model-bar-fill {
+            height: 100%; border-radius: 5px;
+            transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1);
+            width: 0;
+        }
+        .model-bar-fill.bar-0 { background: linear-gradient(90deg, var(--accent), #8b7cf7); }
+        .model-bar-fill.bar-1 { background: linear-gradient(90deg, var(--accent2), #55efc4); }
+        .model-bar-fill.bar-2 { background: linear-gradient(90deg, var(--accent3), #e17055); }
+        .model-bar-fill.bar-3 { background: linear-gradient(90deg, var(--info), #a29bfe); }
+        .model-bar-fill.bar-4 { background: linear-gradient(90deg, var(--accent4), #fbc531); }
+
+        /* ── PREDICTION FORM ──────────────────────────── */
+        .predict-section { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+        .form-group { margin-bottom: 18px; }
+        .form-label {
+            display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary);
+            margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.8px;
+        }
+        .form-select {
+            width: 100%; padding: 12px 16px; border-radius: var(--radius-sm);
+            border: 1px solid var(--glass-border);
+            background: var(--bg-secondary); color: var(--text-primary);
+            font-family: var(--font); font-size: 14px; font-weight: 500;
+            cursor: pointer; transition: border-color 0.3s;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b8da3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 14px center;
+        }
+        .form-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+
+        .btn-predict {
+            width: 100%; padding: 16px; border: none; border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, var(--accent), #8b7cf7);
+            color: #fff; font-family: var(--font); font-size: 15px; font-weight: 700;
+            cursor: pointer; transition: all 0.35s;
+            box-shadow: 0 4px 20px var(--accent-glow);
+            letter-spacing: 0.3px;
+        }
+        .btn-predict:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--accent-glow); }
+        .btn-predict:active { transform: translateY(0); }
+
+        .preset-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+        .preset-chip {
+            padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+            border: 1px solid var(--glass-border); background: var(--glass);
+            color: var(--text-secondary); cursor: pointer; transition: all 0.25s;
+        }
+        .preset-chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(108,92,231,0.1); }
+
+        /* ── PREDICTION RESULT ────────────────────────── */
+        .prediction-result {
+            border-radius: var(--radius); padding: 28px;
+            background: linear-gradient(135deg, rgba(108,92,231,0.08), rgba(0,206,201,0.06));
+            border: 1px solid rgba(108,92,231,0.15);
+            text-align: center;
+        }
+        .result-label { font-size: 13px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        .result-class {
+            font-size: 48px; font-weight: 900; margin: 12px 0;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .result-confidence { font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; }
+        .result-models { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 10px; margin-top: 20px; }
+        .result-model-chip {
+            padding: 12px; border-radius: var(--radius-xs);
+            background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
+            text-align: center;
+        }
+        .result-model-chip .model-name { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .result-model-chip .model-pred { font-size: 14px; font-weight: 700; margin-top: 4px; color: var(--text-primary); }
+
+        .prob-bar-wrap { margin: 6px 0; }
+        .prob-bar-label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+        .prob-bar-label .prob-name { color: var(--text-secondary); font-weight: 500; }
+        .prob-bar-label .prob-val { color: var(--accent); font-family: var(--mono); font-weight: 600; }
+        .prob-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+        .prob-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width 0.8s ease; }
+
+        .hidden { display: none !important; }
+
+        /* ── CORRELATION HEATMAP (CSS grid) ────────────── */
+        .heatmap-grid {
+            display: grid; gap: 2px; margin-top: 10px;
+        }
+        .heatmap-cell {
+            aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-family: var(--mono); font-weight: 600;
+            border-radius: 4px; color: #fff; transition: transform 0.2s;
+        }
+        .heatmap-cell:hover { transform: scale(1.15); z-index: 2; }
+        .heatmap-header {
+            font-size: 10px; font-weight: 700; color: var(--text-muted);
+            display: flex; align-items: center; justify-content: center;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        /* ── FEATURE DROPDOWN ─────────────────────────── */
+        .feature-select-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; }
+        .feature-select-bar label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+        .feature-select-bar select {
+            padding: 8px 14px; border-radius: 8px; border: 1px solid var(--glass-border);
+            background: var(--bg-secondary); color: var(--text-primary);
+            font-family: var(--font); font-size: 13px; cursor: pointer;
+        }
+
+        /* ── LOADING ──────────────────────────────────── */
+        .loading-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: var(--bg-primary);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.5s;
+        }
+        .loading-overlay.fade-out { opacity: 0; pointer-events: none; }
+        .loader-ring {
+            width: 64px; height: 64px; border-radius: 50%;
+            border: 4px solid var(--glass-border);
+            border-top-color: var(--accent);
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loader-text { margin-top: 20px; font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+
+        /* ── RESPONSIVE ───────────────────────────────── */
+        @media (max-width: 768px) {
+            .header { padding: 16px 20px; }
+            .main-content { padding: 20px; }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .predict-section { grid-template-columns: 1fr; }
+            .stat-value { font-size: 26px; }
+            .result-class { font-size: 36px; }
+        }
+
+        /* ── SCROLLBAR ────────────────────────────────── */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        /* Class color badges */
+        .class-badge {
+            display: inline-block; padding: 4px 12px; border-radius: 12px;
+            font-size: 12px; font-weight: 700; text-transform: uppercase;
+        }
+        .class-unacc { background: rgba(225,112,85,0.15); color: var(--danger); }
+        .class-acc   { background: rgba(0,184,148,0.15); color: var(--success); }
+        .class-good  { background: rgba(116,185,255,0.15); color: var(--info); }
+        .class-vgood { background: rgba(108,92,231,0.15); color: var(--accent); }
+
+        .section-title {
+            font-size: 20px; font-weight: 800; margin-bottom: 22px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .section-title .emoji { font-size: 24px; }
+
+        /* ── CV Score chips ────────────────────────────── */
+        .cv-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .cv-chip {
+            padding: 6px 14px; border-radius: 8px;
+            background: rgba(108,92,231,0.1); border: 1px solid rgba(108,92,231,0.2);
+            font-size: 13px; font-family: var(--mono); font-weight: 600; color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loader-ring"></div>
+    <div class="loader-text">Training models & computing analytics...</div>
+</div>
+
+<div class="bg-mesh"></div>
+
+<div class="app-container">
+    <!-- HEADER -->
+    <header class="header">
+        <div class="logo-area">
+            <div class="logo-icon">AI</div>
+            <div class="logo-text">Auto<span>Insight</span></div>
+        </div>
+        <div class="header-badge">🔬 Car Evaluation ML Dashboard</div>
+    </header>
+
+    <main class="main-content">
+        <!-- NAV TABS -->
+        <nav class="nav-tabs" id="navTabs">
+            <button class="nav-tab active" data-tab="overview" id="tab-overview">📊 Overview</button>
+            <button class="nav-tab" data-tab="models" id="tab-models">🤖 Model Comparison</button>
+            <button class="nav-tab" data-tab="exploration" id="tab-exploration">🔍 Data Exploration</button>
+            <button class="nav-tab" data-tab="clustering" id="tab-clustering">🫧 Clustering & PCA</button>
+            <button class="nav-tab" data-tab="prediction" id="tab-prediction">⚡ Predict</button>
+        </nav>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- OVERVIEW TAB -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <section class="tab-panel active" id="panel-overview">
+            <div class="section-title"><span class="emoji">📊</span> Dashboard Overview</div>
+
+            <!-- STAT CARDS -->
+            <div class="grid-4" id="statCards"></div>
+
+            <div class="grid-2">
+                <!-- Class Distribution -->
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(108,92,231,0.15);">🎯</div>
+                        Class Distribution
+                    </div>
+                    <div class="chart-wrap"><canvas id="chartClassDist"></canvas></div>
+                </div>
+
+                <!-- Model Accuracy Comparison -->
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(0,206,201,0.15);">🏆</div>
+                        Model Accuracy Ranking
+                    </div>
+                    <div id="modelBars"></div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Feature Importance -->
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(253,121,168,0.15);">📈</div>
+                        Feature Importance (Random Forest)
+                    </div>
+                    <div class="chart-wrap"><canvas id="chartImportance"></canvas></div>
+                </div>
+
+                <!-- Regression Results -->
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(255,234,167,0.15);">📐</div>
+                        Regression Comparison
+                    </div>
+                    <div class="chart-wrap"><canvas id="chartRegression"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- MODELS TAB -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <section class="tab-panel" id="panel-models">
+            <div class="section-title"><span class="emoji">🤖</span> Model Performance Analysis</div>
+
+            <div class="grid-2">
+                <!-- Confusion Matrix Selector -->
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(108,92,231,0.15);">🔢</div>
+                        Confusion Matrix
+                    </div>
+                    <div class="feature-select-bar">
+                        <label>Model:</label>
+                        <select id="cmModelSelect"></select>
+                    </div>
+                    <div class="chart-wrap"><canvas id="chartCM"></canvas></div>
+                </div>
+
+                <!-- Classification Report Table -->
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(0,206,201,0.15);">📋</div>
+                        Classification Report
+                    </div>
+                    <div id="reportTableWrap" style="overflow-x:auto;"></div>
+                </div>
+            </div>
+
+            <!-- Cross Validation -->
+            <div class="card" style="margin-bottom:28px;">
+                <div class="card-title">
+                    <div class="icon" style="background:rgba(116,185,255,0.15);">🔄</div>
+                    Cross-Validation (Random Forest — 5-Fold)
+                </div>
+                <div id="cvSection"></div>
+            </div>
+
+            <!-- Accuracies radar -->
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(253,121,168,0.15);">🕸️</div>
+                        Model Comparison Radar
+                    </div>
+                    <div class="chart-wrap"><canvas id="chartRadar"></canvas></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(255,234,167,0.15);">📊</div>
+                        Per-Class F1 Scores
+                    </div>
+                    <div class="chart-wrap"><canvas id="chartF1"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- EXPLORATION TAB -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <section class="tab-panel" id="panel-exploration">
+            <div class="section-title"><span class="emoji">🔍</span> Data Exploration</div>
+
+            <div class="grid-2">
+                <!-- Interactive Feature Explorer -->
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(108,92,231,0.15);">🔬</div>
+                        Feature vs Class Distribution
+                    </div>
+                    <div class="feature-select-bar">
+                        <label>Feature:</label>
+                        <select id="featureExploreSelect"></select>
+                    </div>
+                    <div class="chart-wrap"><canvas id="chartFeatureExplore"></canvas></div>
+                </div>
+
+                <!-- Correlation Heatmap -->
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(0,206,201,0.15);">🌡️</div>
+                        Correlation Heatmap
+                    </div>
+                    <div id="heatmapContainer"></div>
+                </div>
+            </div>
+
+            <!-- Descriptive Stats -->
+            <div class="card">
+                <div class="card-title">
+                    <div class="icon" style="background:rgba(253,121,168,0.15);">📏</div>
+                    Descriptive Statistics (Encoded Data)
+                </div>
+                <div id="descStatsTable" style="overflow-x:auto;"></div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- CLUSTERING TAB -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <section class="tab-panel" id="panel-clustering">
+            <div class="section-title"><span class="emoji">🫧</span> Clustering & Dimensionality Reduction</div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(108,92,231,0.15);">📉</div>
+                        Elbow Method (K-Means WCSS)
+                    </div>
+                    <div class="chart-wrap"><canvas id="chartElbow"></canvas></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(0,206,201,0.15);">🗺️</div>
+                        PCA Variance Explained
+                    </div>
+                    <div class="chart-wrap"><canvas id="chartPCA"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!-- PREDICTION TAB -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <section class="tab-panel" id="panel-prediction">
+            <div class="section-title"><span class="emoji">⚡</span> Real-Time Prediction</div>
+
+            <!-- Presets -->
+            <div class="preset-bar" id="presetBar">
+                <div class="preset-chip" data-preset="luxury" id="preset-luxury">🏎️ Luxury Car</div>
+                <div class="preset-chip" data-preset="budget" id="preset-budget">💰 Budget Car</div>
+                <div class="preset-chip" data-preset="family" id="preset-family">👨‍👩‍👧‍👦 Family Car</div>
+                <div class="preset-chip" data-preset="safe" id="preset-safe">🛡️ Safety First</div>
+                <div class="preset-chip" data-preset="worst" id="preset-worst">❌ Worst Case</div>
+            </div>
+
+            <div class="predict-section">
+                <!-- Left: Form -->
+                <div class="card">
+                    <div class="card-title">
+                        <div class="icon" style="background:rgba(108,92,231,0.15);">🎛️</div>
+                        Configure Car Parameters
+                    </div>
+                    <div id="predictForm"></div>
+                    <button class="btn-predict" id="btnPredict" onclick="makePrediction()">
+                        ⚡ Predict Car Evaluation
+                    </button>
+                </div>
+
+                <!-- Right: Result -->
+                <div>
+                    <div class="card hidden" id="resultCard">
+                        <div class="prediction-result" id="predictionResult"></div>
+                    </div>
+                    <div class="card hidden" id="probCard" style="margin-top:20px;">
+                        <div class="card-title">
+                            <div class="icon" style="background:rgba(0,206,201,0.15);">📊</div>
+                            Prediction Probabilities
+                        </div>
+                        <div id="probBars"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// GLOBALS
+// ═══════════════════════════════════════════════════
+let DASH = {};
+let charts = {};
+
+const COLORS = {
+    accent: '#6c5ce7', accent2: '#00cec9', accent3: '#fd79a8', accent4: '#ffeaa7',
+    success: '#00b894', warning: '#fdcb6e', danger: '#e17055', info: '#74b9ff',
+};
+const CHART_COLORS = ['#6c5ce7','#00cec9','#fd79a8','#ffeaa7','#74b9ff','#55efc4','#e17055','#a29bfe'];
+
+const CLASS_COLORS = {
+    'unacc': '#e17055', 'acc': '#00b894', 'good': '#74b9ff', 'vgood': '#6c5ce7'
+};
+
+// Chart.js global defaults
+Chart.defaults.color = '#8b8da3';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.06)';
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.padding = 16;
+Chart.defaults.animation.duration = 1200;
+
+// ═══════════════════════════════════════════════════
+// FETCH DATA & INIT
+// ═══════════════════════════════════════════════════
+async function init() {
+    try {
+        const r = await fetch('/api/dashboard-data');
+        DASH = await r.json();
+        buildDashboard();
+    } catch (e) {
+        console.error('Failed to load dashboard data:', e);
+    } finally {
+        const overlay = document.getElementById('loadingOverlay');
+        overlay.classList.add('fade-out');
+        setTimeout(() => overlay.style.display = 'none', 600);
+    }
+}
+
+function buildDashboard() {
+    buildStatCards();
+    buildClassDistChart();
+    buildModelBars();
+    buildImportanceChart();
+    buildRegressionChart();
+    buildCMChart('Random Forest');
+    populateCMSelect();
+    buildReportTable('Random Forest');
+    buildCVSection();
+    buildRadarChart();
+    buildF1Chart();
+    buildFeatureExplorer();
+    buildHeatmap();
+    buildDescStats();
+    buildElbowChart();
+    buildPCAChart();
+    buildPredictForm();
+}
+
+// ═══════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════
+document.getElementById('navTabs').addEventListener('click', e => {
+    if (!e.target.classList.contains('nav-tab')) return;
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    e.target.classList.add('active');
+    document.getElementById('panel-' + e.target.dataset.tab).classList.add('active');
+});
+
+// ═══════════════════════════════════════════════════
+// OVERVIEW
+// ═══════════════════════════════════════════════════
+function buildStatCards() {
+    const bestModel = Object.entries(DASH.model_results).reduce((a, b) => b[1].accuracy > a[1].accuracy ? b : a);
+    const stats = [
+        { label: 'Total Samples', value: DASH.total_samples.toLocaleString(), sub: `${DASH.total_features} features`, cls: 'accent' },
+        { label: 'Best Accuracy', value: (bestModel[1].accuracy * 100).toFixed(1) + '%', sub: bestModel[0], cls: 'accent2' },
+        { label: 'Models Trained', value: Object.keys(DASH.model_results).length, sub: 'Classification models', cls: 'accent3' },
+        { label: 'CV Mean Accuracy', value: ((DASH.model_results['Random Forest'].cv_mean || 0) * 100).toFixed(1) + '%', sub: '5-fold cross-validation', cls: 'accent4' },
+    ];
+    document.getElementById('statCards').innerHTML = stats.map(s => `
+        <div class="stat-card">
+            <div class="stat-label">${s.label}</div>
+            <div class="stat-value ${s.cls}">${s.value}</div>
+            <div class="stat-sub">${s.sub}</div>
+        </div>
+    `).join('');
+}
+
+function buildClassDistChart() {
+    const labels = Object.keys(DASH.class_distribution);
+    const data   = Object.values(DASH.class_distribution);
+    charts.classDist = new Chart(document.getElementById('chartClassDist'), {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data,
+                backgroundColor: labels.map(l => CLASS_COLORS[l] || CHART_COLORS[0]),
+                borderWidth: 0,
+                hoverOffset: 12,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            cutout: '65%',
+            plugins: {
+                legend: { position: 'bottom' },
+            }
+        }
+    });
+}
+
+function buildModelBars() {
+    const sorted = Object.entries(DASH.model_results).sort((a, b) => b[1].accuracy - a[1].accuracy);
+    document.getElementById('modelBars').innerHTML = sorted.map(([name, res], i) => `
+        <div class="model-bar-wrap">
+            <div class="model-bar-label">
+                <span>${name}</span>
+                <span>${(res.accuracy * 100).toFixed(2)}%</span>
+            </div>
+            <div class="model-bar-track">
+                <div class="model-bar-fill bar-${i}" id="bar-${i}" style="width:0%"></div>
+            </div>
+        </div>
+    `).join('');
+    // animate
+    requestAnimationFrame(() => {
+        sorted.forEach(([_, res], i) => {
+            document.getElementById('bar-' + i).style.width = (res.accuracy * 100) + '%';
+        });
+    });
+}
+
+function buildImportanceChart() {
+    const entries = Object.entries(DASH.feature_importance).sort((a, b) => b[1] - a[1]);
+    charts.importance = new Chart(document.getElementById('chartImportance'), {
+        type: 'bar',
+        data: {
+            labels: entries.map(e => e[0]),
+            datasets: [{
+                label: 'Importance',
+                data: entries.map(e => e[1]),
+                backgroundColor: entries.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+                borderRadius: 6,
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+}
+
+function buildRegressionChart() {
+    const r = DASH.regression;
+    charts.regression = new Chart(document.getElementById('chartRegression'), {
+        type: 'bar',
+        data: {
+            labels: ['R² Score', 'RMSE'],
+            datasets: [
+                {
+                    label: 'Linear Regression',
+                    data: [r.linear.r2, r.linear.rmse],
+                    backgroundColor: 'rgba(108,92,231,0.7)',
+                    borderRadius: 6,
+                },
+                {
+                    label: 'Polynomial Regression',
+                    data: [r.polynomial.r2, r.polynomial.rmse],
+                    backgroundColor: 'rgba(0,206,201,0.7)',
+                    borderRadius: 6,
+                }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: 'rgba(255,255,255,0.04)' } }
+            }
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════════
+// MODELS TAB
+// ═══════════════════════════════════════════════════
+function populateCMSelect() {
+    const sel = document.getElementById('cmModelSelect');
+    sel.innerHTML = Object.keys(DASH.model_results).map(n => `<option value="${n}" ${n==='Random Forest'?'selected':''}>${n}</option>`).join('');
+    sel.addEventListener('change', () => {
+        buildCMChart(sel.value);
+        buildReportTable(sel.value);
+    });
+}
+
+function buildCMChart(modelName) {
+    const cm = DASH.model_results[modelName].confusion_matrix;
+    const labels = DASH.encoded_class_names;
+    if (charts.cm) charts.cm.destroy();
+
+    // Flatten for heatmap-like bubble
+    const dataPoints = [];
+    cm.forEach((row, i) => row.forEach((val, j) => {
+        dataPoints.push({ x: j, y: i, v: val });
+    }));
+
+    const maxVal = Math.max(...cm.flat());
+
+    charts.cm = new Chart(document.getElementById('chartCM'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: cm.map((row, i) => ({
+                label: labels[i],
+                data: row,
+                backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + 'AA',
+                borderRadius: 4,
+            }))
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: {
+                legend: { position: 'top' },
+                title: { display: true, text: `${modelName} — Confusion Matrix`, color: '#f0f1f7', font: { weight: 600 } },
+            },
+            scales: {
+                x: { stacked: true, grid: { display: false } },
+                y: { stacked: true, grid: { color: 'rgba(255,255,255,0.04)' } },
+            }
+        }
+    });
+}
+
+function buildReportTable(modelName) {
+    const report = DASH.model_results[modelName].report;
+    const classes = DASH.encoded_class_names;
+    let html = `<table class="data-table">
+        <tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1-Score</th><th>Support</th></tr>`;
+    classes.forEach(c => {
+        const r = report[c] || {};
+        html += `<tr>
+            <td><span class="class-badge class-${c}">${c}</span></td>
+            <td>${(r.precision||0).toFixed(3)}</td>
+            <td>${(r.recall||0).toFixed(3)}</td>
+            <td>${(r['f1-score']||0).toFixed(3)}</td>
+            <td>${r.support||0}</td>
+        </tr>`;
+    });
+    // add macro/weighted
+    ['macro avg','weighted avg'].forEach(k => {
+        const r = report[k] || {};
+        html += `<tr style="font-weight:600;">
+            <td>${k}</td>
+            <td>${(r.precision||0).toFixed(3)}</td>
+            <td>${(r.recall||0).toFixed(3)}</td>
+            <td>${(r['f1-score']||0).toFixed(3)}</td>
+            <td>${r.support||0}</td>
+        </tr>`;
+    });
+    html += '</table>';
+    document.getElementById('reportTableWrap').innerHTML = html;
+}
+
+function buildCVSection() {
+    const rf = DASH.model_results['Random Forest'];
+    let html = `
+        <div style="display:flex;gap:32px;align-items:center;flex-wrap:wrap;">
+            <div>
+                <div class="stat-label">Mean Accuracy</div>
+                <div class="stat-value accent" style="font-size:28px;">${(rf.cv_mean*100).toFixed(2)}%</div>
+            </div>
+            <div>
+                <div class="stat-label">Standard Deviation</div>
+                <div class="stat-value accent2" style="font-size:28px;">±${(rf.cv_std*100).toFixed(2)}%</div>
+            </div>
+        </div>
+        <div class="cv-chips">
+            ${(rf.cv_scores||[]).map((s,i) => `<div class="cv-chip">Fold ${i+1}: ${(s*100).toFixed(2)}%</div>`).join('')}
+        </div>
+    `;
+    document.getElementById('cvSection').innerHTML = html;
+}
+
+function buildRadarChart() {
+    const modelNames = Object.keys(DASH.model_results);
+    const metrics = ['accuracy'];
+    // Get macro-avg precision, recall, f1
+    const datasets = modelNames.map((name, i) => {
+        const r = DASH.model_results[name].report;
+        const ma = r['macro avg'] || {};
+        return {
+            label: name,
+            data: [
+                DASH.model_results[name].accuracy,
+                ma.precision || 0,
+                ma.recall || 0,
+                ma['f1-score'] || 0,
+            ],
+            borderColor: CHART_COLORS[i],
+            backgroundColor: CHART_COLORS[i] + '22',
+            borderWidth: 2,
+            pointRadius: 4,
+            pointBackgroundColor: CHART_COLORS[i],
+        };
+    });
+
+    charts.radar = new Chart(document.getElementById('chartRadar'), {
+        type: 'radar',
+        data: {
+            labels: ['Accuracy', 'Precision (Macro)', 'Recall (Macro)', 'F1-Score (Macro)'],
+            datasets,
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            scales: {
+                r: {
+                    beginAtZero: true, max: 1,
+                    grid: { color: 'rgba(255,255,255,0.06)' },
+                    angleLines: { color: 'rgba(255,255,255,0.06)' },
+                    pointLabels: { font: { size: 11, weight: 600 } },
+                }
+            },
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+}
+
+function buildF1Chart() {
+    const modelNames = Object.keys(DASH.model_results);
+    const classes = DASH.encoded_class_names;
+
+    charts.f1 = new Chart(document.getElementById('chartF1'), {
+        type: 'bar',
+        data: {
+            labels: classes,
+            datasets: modelNames.map((name, i) => ({
+                label: name,
+                data: classes.map(c => {
+                    const r = DASH.model_results[name].report[c];
+                    return r ? r['f1-score'] : 0;
+                }),
+                backgroundColor: CHART_COLORS[i] + 'BB',
+                borderRadius: 4,
+            }))
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { beginAtZero: true, max: 1, grid: { color: 'rgba(255,255,255,0.04)' } }
+            }
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════════
+// DATA EXPLORATION
+// ═══════════════════════════════════════════════════
+function buildFeatureExplorer() {
+    const sel = document.getElementById('featureExploreSelect');
+    sel.innerHTML = DASH.feature_names.map(f => `<option value="${f}">${f}</option>`).join('');
+    sel.addEventListener('change', () => renderFeatureChart(sel.value));
+    renderFeatureChart(DASH.feature_names[0]);
+}
+
+function renderFeatureChart(feature) {
+    const fd = DASH.feature_distributions[feature];
+    if (charts.featureExplore) charts.featureExplore.destroy();
+
+    charts.featureExplore = new Chart(document.getElementById('chartFeatureExplore'), {
+        type: 'bar',
+        data: {
+            labels: fd.labels,
+            datasets: fd.classes.map((cls, i) => ({
+                label: cls,
+                data: fd.data.map(row => row[i]),
+                backgroundColor: CLASS_COLORS[cls] || CHART_COLORS[i],
+                borderRadius: 4,
+            }))
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: { legend: { position: 'top' } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: 'rgba(255,255,255,0.04)' } }
+            }
+        }
+    });
+}
+
+function buildHeatmap() {
+    const { columns, values } = DASH.correlation;
+    const n = columns.length;
+    const container = document.getElementById('heatmapContainer');
+
+    let html = `<div class="heatmap-grid" style="grid-template-columns: 60px repeat(${n}, 1fr);">`;
+    // header row
+    html += '<div></div>';
+    columns.forEach(c => { html += `<div class="heatmap-header">${c}</div>`; });
+    // data rows
+    values.forEach((row, i) => {
+        html += `<div class="heatmap-header">${columns[i]}</div>`;
+        row.forEach(v => {
+            const intensity = Math.abs(v);
+            const r = v > 0 ? 108 : 0;
+            const g = v > 0 ? 92 : 206;
+            const b = v > 0 ? 231 : 201;
+            const bg = `rgba(${r},${g},${b},${0.15 + intensity * 0.7})`;
+            html += `<div class="heatmap-cell" style="background:${bg}" title="${columns[i]} × ${columns[values.indexOf(row)]}: ${v}">${v}</div>`;
+        });
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function buildDescStats() {
+    const { mean, median, std } = DASH.desc_stats;
+    const cols = Object.keys(mean);
+    let html = `<table class="data-table">
+        <tr><th>Statistic</th>${cols.map(c => `<th>${c}</th>`).join('')}</tr>
+        <tr><td style="font-weight:600;">Mean</td>${cols.map(c => `<td>${mean[c]}</td>`).join('')}</tr>
+        <tr><td style="font-weight:600;">Median</td>${cols.map(c => `<td>${median[c]}</td>`).join('')}</tr>
+        <tr><td style="font-weight:600;">Std Dev</td>${cols.map(c => `<td>${std[c]}</td>`).join('')}</tr>
+    </table>`;
+    document.getElementById('descStatsTable').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════
+// CLUSTERING & PCA
+// ═══════════════════════════════════════════════════
+function buildElbowChart() {
+    charts.elbow = new Chart(document.getElementById('chartElbow'), {
+        type: 'line',
+        data: {
+            labels: Array.from({length: 10}, (_, i) => i + 1),
+            datasets: [{
+                label: 'WCSS',
+                data: DASH.kmeans_wcss,
+                borderColor: COLORS.accent,
+                backgroundColor: COLORS.accent + '22',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 6,
+                pointBackgroundColor: COLORS.accent,
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Optimal K — Elbow Method', color: '#f0f1f7', font: { weight: 600 } }
+            },
+            scales: {
+                x: { title: { display: true, text: 'Number of Clusters' }, grid: { display: false } },
+                y: { title: { display: true, text: 'WCSS' }, grid: { color: 'rgba(255,255,255,0.04)' } }
+            }
+        }
+    });
+}
+
+function buildPCAChart() {
+    charts.pca = new Chart(document.getElementById('chartPCA'), {
+        type: 'bar',
+        data: {
+            labels: ['PC1', 'PC2'],
+            datasets: [{
+                label: 'Variance Ratio',
+                data: DASH.pca_variance,
+                backgroundColor: [COLORS.accent + 'CC', COLORS.accent2 + 'CC'],
+                borderRadius: 8,
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'PCA — Explained Variance Ratio', color: '#f0f1f7', font: { weight: 600 } }
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)' } }
+            }
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════════
+// PREDICTION
+// ═══════════════════════════════════════════════════
+function buildPredictForm() {
+    const form = document.getElementById('predictForm');
+    const labelMap = {
+        buying: '💰 Buying Price', maint: '🔧 Maintenance Cost',
+        doors: '🚪 Number of Doors', persons: '👥 Persons Capacity',
+        lug_boot: '🧳 Luggage Boot Size', safety: '🛡️ Safety Rating'
+    };
+    form.innerHTML = DASH.feature_names.map(f => `
+        <div class="form-group">
+            <label class="form-label" for="input-${f}">${labelMap[f] || f}</label>
+            <select class="form-select" id="input-${f}">
+                ${DASH.feature_options[f].map(v => `<option value="${v}">${v}</option>`).join('')}
+            </select>
+        </div>
+    `).join('');
+}
+
+// Presets
+const PRESETS = {
+    luxury: { buying: 'vhigh', maint: 'vhigh', doors: '4', persons: '4', lug_boot: 'big', safety: 'high' },
+    budget: { buying: 'low', maint: 'low', doors: '2', persons: '2', lug_boot: 'small', safety: 'low' },
+    family: { buying: 'med', maint: 'med', doors: '5more', persons: 'more', lug_boot: 'big', safety: 'high' },
+    safe:   { buying: 'low', maint: 'low', doors: '4', persons: 'more', lug_boot: 'big', safety: 'high' },
+    worst:  { buying: 'vhigh', maint: 'vhigh', doors: '2', persons: '2', lug_boot: 'small', safety: 'low' },
+};
+
+document.getElementById('presetBar').addEventListener('click', e => {
+    const chip = e.target.closest('.preset-chip');
+    if (!chip) return;
+    const preset = PRESETS[chip.dataset.preset];
+    if (!preset) return;
+    Object.entries(preset).forEach(([k, v]) => {
+        const el = document.getElementById('input-' + k);
+        if (el) el.value = v;
+    });
+});
+
+async function makePrediction() {
+    const btn = document.getElementById('btnPredict');
+    btn.textContent = '⏳ Predicting...';
+    btn.disabled = true;
+
+    const payload = {};
+    DASH.feature_names.forEach(f => {
+        payload[f] = document.getElementById('input-' + f).value;
+    });
+
+    try {
+        const r = await fetch('/api/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await r.json();
+
+        if (data.error) {
+            alert('Prediction error: ' + data.error);
+            return;
+        }
+
+        // Show result card
+        const resultCard = document.getElementById('resultCard');
+        const probCard = document.getElementById('probCard');
+        resultCard.classList.remove('hidden');
+        probCard.classList.remove('hidden');
+
+        // Main prediction
+        const maxProb = data.probabilities ? Math.max(...Object.values(data.probabilities)) : null;
+        document.getElementById('predictionResult').innerHTML = `
+            <div class="result-label">Predicted Car Evaluation</div>
+            <div class="result-class">${data.prediction}</div>
+            ${maxProb ? `<div class="result-confidence">Confidence: ${(maxProb * 100).toFixed(1)}%</div>` : ''}
+            <div class="result-models">
+                ${Object.entries(data.all_models).map(([name, pred]) => `
+                    <div class="result-model-chip">
+                        <div class="model-name">${name}</div>
+                        <div class="model-pred"><span class="class-badge class-${pred}">${pred}</span></div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        // Probability bars
+        if (data.probabilities) {
+            document.getElementById('probBars').innerHTML = Object.entries(data.probabilities)
+                .sort((a, b) => b[1] - a[1])
+                .map(([cls, prob]) => `
+                    <div class="prob-bar-wrap">
+                        <div class="prob-bar-label">
+                            <span class="prob-name">${cls}</span>
+                            <span class="prob-val">${(prob * 100).toFixed(1)}%</span>
+                        </div>
+                        <div class="prob-track">
+                            <div class="prob-fill" style="width:${prob * 100}%;background:${CLASS_COLORS[cls] || COLORS.accent}"></div>
+                        </div>
+                    </div>
+                `).join('');
+        }
+    } catch (e) {
+        alert('Network error: ' + e.message);
+    } finally {
+        btn.textContent = '⚡ Predict Car Evaluation';
+        btn.disabled = false;
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
